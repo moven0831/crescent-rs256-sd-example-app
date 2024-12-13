@@ -15,9 +15,9 @@ external dependencies have been forked into this project; see the [NOTICE](./NOT
 *Disclaimer: This code has not been carefully audited for security and should not be used in a production environment.*
 
 ## Documentation
-A report describing Crescent can be found in the root directory. 
+A report describing Crescent is available on the IACR ePrint Archive. 
 
-[Crescent: Stronger Privacy for Existing Credentials (DRAFT)](https://github.com/microsoft/crescent-credentials/blob/main/crescent-credentials.pdf)   
+[Crescent: Stronger Privacy for Existing Credentials (DRAFT)](https://eprint.iacr.org/2024/2013)   
 Christian Paquin, Guru-Vamsi Policharla and Greg Zaverucha   
 December 2024  
 
