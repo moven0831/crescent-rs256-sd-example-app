@@ -1,0 +1,21 @@
+[package]
+name = "crescent-sample-verifier"
+version = "0.4.0"
+edition = "2021"
+default-run = "crescent-sample-verifier"
+
+[dependencies]
+rocket = { version = "0.5.1", features = ["json", "tls"] }
+rocket_dyn_templates = { version = "0.1.0", features = ["tera"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+fs_extra = "1.2"
+jsonwebkey = { version = "0.3.5", features = ["pkcs-convert"] }
+ureq = "2.5"
+uuid = { version = "1", features = ["v4"] }
+crescent = {path="../../creds"}
+crescent-sample-setup-service = {path="../setup_service"}
+
+[profile.dev.package."*"]
+opt-level = 3               # optimize dependencies, even in dev builds
+debug-assertions = false    # We need this to work around a bug in Wasmer

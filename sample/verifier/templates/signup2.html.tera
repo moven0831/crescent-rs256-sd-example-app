@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ site2_verifier_name }} Sign Up Page</title>
+    <link rel="stylesheet" href="css/site2_style.css">
+    <link rel="icon" href="img/site2-favicon.ico" type="image/x-icon">
+</head>
+<body>
+
+<div class="boxed">
+    <h1> {{ site2_verifier_name }} </h1>
+    <p style="text-align: center;">
+        <strong>Thank you for proving that you are over 18.</strong><br>
+        You can now create an account.
+    </p>
+    <h2>Account creation</h2>
+    <div class="profile-form-container">
+        <div class="profile-section">
+            <img src="img/default-profile.png" alt="Default Profile Image">
+            <button type="button">Pick Profile Picture</button>
+        </div>
+
+        <form action="/create" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password1">Password</label>
+                <input type="password" id="password1" name="password1" required>
+            </div>
+            <div class="form-group">
+                <label for="password2">Confirm password</label>
+                <input type="password" id="password2" name="password2" required>
+            </div>
+            <div class="form-group">
+                <label for="firstname">First name</label>
+                <input type="text" id="firstname" name="firstname" required>
+            </div>
+            <div class="form-group">
+                <label for="lastname">Last name</label>
+                <input type="text" id="lastname" name="lastname" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Create account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Helper Test Page</title>
+    <script>
+        // URL of the Client Helper service
+        const clientHelperUrl = 'http://127.0.0.1:8003'
+        
+        // Credential UID to be used in the page
+        let cred_uid = null;
+
+        async function prepareTask() {
+            try {
+                const cred = document.getElementById("credInput").value;
+                const schema_uid = document.getElementById("schemaUidInput").value;
+                const issuer_url = document.getElementById("issuerUrlInput").value;
+
+                const credInfo = {
+                    cred,
+                    schema_uid,
+                    issuer_url
+                };
+
+                // Send POST request to /prepare
+                const response = await fetch(`${clientHelperUrl}/prepare`, { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(credInfo)
+                });
+                cred_uid = await response.text();
+                console.log('Prepare task started. Cred UID:', cred_uid);
+                document.getElementById('status').innerText = 'Preparing...';
+                
+                // Poll the status route every 5 second
+                const intervalId = setInterval(async function() {
+                    const statusResponse = await fetch(`${clientHelperUrl}/status?cred_uid=${cred_uid}`);
+                    const status = await statusResponse.text();
+                    console.log('Task status:', status);
+                    document.getElementById('status').innerText = `Task Status: ${status}`;
+                    
+                    if (status === 'ready' || status === 'error' || status === 'unknown') {
+                        // stop polling when the task is ready, errored or unknown
+                        clearInterval(intervalId);
+                    }
+                    if (status === 'ready') {
+                        // enable the buttons when the task is ready
+                        document.getElementById('deleteButton').disabled = false;
+                        document.getElementById('getShowDataButton').disabled = false;
+                        document.getElementById('showCredentialButton').disabled = false;
+                    }
+                }, 5000);
+            } catch (error) {
+                console.error('Error starting prepare task:', error);
+            }
+        }
+    
+        async function deleteCredential() {
+            try {
+                if (!cred_uid) {
+                    throw new Error("cred_uid is not available. Please start the task first.");
+                }
+
+                const deleteResponse = await fetch(`${clientHelperUrl}/delete?cred_uid=${cred_uid}`);
+                if (!deleteResponse.ok) { 
+                    throw new Error('Failed to delete credential'); 
+                }
+            } catch (error) {
+                console.error('Error deleting the credential:', error);
+                document.getElementById('status').innerText = 'Error deleting the credential: ' + error.message;
+            }
+        }
+
+        async function getShowData() {
+            try {
+                const showDataResponse = await fetch(`${clientHelperUrl}/getshowdata?cred_uid=${cred_uid}`);
+                if (!showDataResponse.ok) {
+                    throw new Error('Failed to fetch ShowData');
+                }
+                const showData = await showDataResponse.json();
+                console.log('ShowData:', showData);
+                
+                // Display the ShowData in the textarea
+                document.getElementById('showDataTextarea').value = JSON.stringify(showData, null, 2);
+            } catch (error) {
+                console.error('Error fetching ShowData:', error);
+                document.getElementById('status').innerText = 'Error fetching ShowData: ' + error.message;
+            }
+        }
+
+        async function showCredential() {
+            try {
+                if (!cred_uid) {
+                    throw new Error("cred_uid is not available. Please start the task first.");
+                }
+
+                // the disclosure UID associated with the credential
+                const disclosure_UID = document.getElementById("disclosureUidSelect").value;
+                const showResponse = await fetch(`${clientHelperUrl}/show?cred_uid=${cred_uid}&disc_uid=${disclosure_UID}`);
+                if (!showResponse.ok) { 
+                    throw new Error('Failed to fetch Show Proof'); 
+                }
+                const show_proof_b64 = await showResponse.text(); console.log('Show Proof:', show_proof_b64);
+                // Display the Show Proof in the textarea
+                document.getElementById('showProofTextarea').value = show_proof_b64;
+                
+                // Display the test command in the textarea                
+                const schema_uid = document.getElementById("schemaUidInput").value;
+                const test_command = `wget --method=POST --body-data='{"schema_uid":"${schema_uid}", "issuer_url":"http://127.0.0.1:8001", "proof":"${show_proof_b64}", "disclosure_uid":"${disclosure_UID}"}' --header='Content-Type: application/json' --server-response --max-redirect=3 -d http://127.0.0.1:8004/verify -O- --no-verbose`;
+                document.getElementById('testCommand').value = test_command;
+                console.log(test_command);
+            } catch (error) {
+                console.error('Error fetching Show Proof:', error);
+                document.getElementById('status').innerText = 'Error fetching Show Proof: ' + error.message;
+            }
+        }
+    </script>    
+</head>
+<body>
+    <h1>Client Helper Test Page</h1>
+    <p>This is a test page for the Client Helper service.</p>
+    <div>
+        <h2>Credential Information</h2>
+        <label for="credInput">Credential (JWT or mDL):</label><br>
+        <textarea id="credInput" rows="3" cols="80"></textarea><br>
+        
+        <label for="schemaUidInput">Schema UID:</label>
+        <select id="schemaUidInput">
+            <option value="jwt_corporate_1">jwt_corporate_1</option>
+            <option value="mdl_1">mdl_1</option>
+        </select><br>
+        
+        <label for="issuerUrlInput">Issuer URL:</label><br>
+        <input type="text" id="issuerUrlInput" size="80" value="http://127.0.0.1:8001"><br>
+    </div>
+    <hr>
+    <div>
+        <h2>Prepare Credential</h2>
+        <p id="status">Click the button to start preparing a credential for showing given a JWT (hardcoded in the page).</p>
+        <button onclick="prepareTask()">Start Task</button>
+    </div>
+    <hr>
+    <div>
+        <h2>Delete Credential (OPTIONAL)</h2>
+        <p>Click the button to delete the credential.</p>
+        <button id="deleteButton" onclick="deleteCredential()" disabled>Delete credential</button>
+    </div>
+    <hr>
+    <div>
+        <h2>ShowData (OPTIONAL)</h2>
+        <p>Click the "Get Show Data" to retrieve the data required to show a credential. Note: this step is not required for now;
+            the browser extension should directly "Show" the credential when ready (next button), but in the future, the Show Data could be
+            retrieved and stored by the extension who would then Show the credential locally. This button tests this future option.</p>
+        <button id="getShowDataButton" onclick="getShowData()" disabled>Get Show Data</button> <!-- Button disabled initially -->
+        <br>
+        <textarea id="showDataTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display ShowData -->
+    </div>
+    <hr>
+    <div>
+        <h2>Show Proof:</h2>
+        <p>Click "Show Credential" to fetch the proof for the credential.</p>
+        <label for="disclosureUidSelect">Disclosure UID:</label>
+        <select id="disclosureUidSelect">
+            <option value="crescent://email_domain">crescent://email_domain</option>
+            <option value="crescent://over_21">crescent://over_21</option>
+            <option value="crescent://over_18">crescent://over_18</option>
+            <option value="crescent://over_65">crescent://over_65</option>
+        </select><br>
+        <button id="showCredentialButton" onclick="showCredential()" disabled>Show Credential</button> <!-- Button disabled initially -->
+        <br>
+        <textarea id="showProofTextarea" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
+        <br> Use this command to test from the console:<br>
+        <textarea id="testCommand" rows="10" cols="80" readonly></textarea> <!-- Textarea to display Show Proof -->
+    </div>
+
+
+
+</body>
+</html>

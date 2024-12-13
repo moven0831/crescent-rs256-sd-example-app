@@ -1,0 +1,40 @@
+/* General body styling */
+body {
+    background-color: #faf9f6;
+    color: #000000;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    margin: 2em;
+    padding: 0;
+    font-size: 90%;
+}
+
+/* Header styling */
+h1 {
+    color: #03230a;
+    font-size: 2.5em;
+}
+
+/* Paragraph styling */
+p {
+    color: #03230a;
+    font-size: 1.2em;
+    line-height: 1.6;
+    margin-bottom: 5px;
+}
+
+/* Error message styling */
+p[style="color: red;"] {
+    color: #ff4c4c;
+    font-weight: bold;
+}
+
+/* Add a subtle hover effect to links */
+a {
+    color: #61dafb;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: #ffffff;
+}

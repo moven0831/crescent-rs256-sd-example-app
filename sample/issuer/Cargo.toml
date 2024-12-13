@@ -1,0 +1,13 @@
+[package]
+name = "crescent-sample-issuer"
+version = "0.4.0"
+edition = "2021"
+default-run = "crescent-sample-issuer"
+
+[dependencies]
+rocket = { version = "0.5.1", features = ["json", "tls"] }
+rocket_dyn_templates = { version = "0.1.0", features = ["tera"] }
+serde = { version = "1.0", features = ["derive"] }
+jsonwebtoken = "9.1"
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1.0"

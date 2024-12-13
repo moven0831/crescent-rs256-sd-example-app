@@ -1,0 +1,4 @@
+generated_files/*
+!generated_files/README.md
+logs
+scripts/__pycache__/*

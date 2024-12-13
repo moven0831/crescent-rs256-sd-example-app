@@ -1,0 +1,23 @@
+.vscode/
+target/
+Cargo.lock
+
+# ignore test vectors, but not the README
+creds/test-vectors
+!creds/test-vectors/README
+
+# sample files
+sample/issuer/.well-known/
+sample/issuer/keys/
+sample/client/.vscode/crescent-client-extension.code-workspace
+sample/client/node_modules
+sample/client/dist
+sample/client_helper/data
+sample/verifier/data
+
+# sample credentials that are generated
+circuit_setup/inputs/*/issuer.prv
+circuit_setup/inputs/*/issuer.pub
+circuit_setup/inputs/*/token.jwt
+
+setup/generated_files/
