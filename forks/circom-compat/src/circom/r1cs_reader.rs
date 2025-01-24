@@ -108,25 +108,27 @@ impl<E: Pairing> R1CSFile<E> {
 
         let header = Header::new(&mut reader, *header_size?)?;
 
-        let constraint_offset = sec_offsets.get(&constraint_type).ok_or_else(|| {
+        let constraint_offset = *sec_offsets.get(&constraint_type).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
                 "No section offset for constraint type found",
             )
-        });
+        })?;
 
-        reader.seek(SeekFrom::Start(*constraint_offset?))?;
-
-        let constraints = read_constraints::<&mut R, E>(&mut reader, &header)?;
-
-        let wire2label_offset = sec_offsets.get(&wire2label_type).ok_or_else(|| {
+        let wire2label_offset = *sec_offsets.get(&wire2label_type).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
                 "No section offset for wire2label type found",
             )
-        });
+        })?;
 
-        reader.seek(SeekFrom::Start(*wire2label_offset?))?;
+        let constraint_section_size = (wire2label_offset - constraint_offset) as usize;
+
+        reader.seek(SeekFrom::Start(constraint_offset))?;
+
+        let constraints = read_constraints::<&mut R, E>(&mut reader, &header, constraint_section_size)?;
+
+        reader.seek(SeekFrom::Start(wire2label_offset))?;
 
         let wire2label_size = sec_sizes.get(&wire2label_type).ok_or_else(|| {
             Error::new(
@@ -200,29 +202,55 @@ impl Header {
     }
 }
 
-fn read_constraint_vec<R: Read, E: Pairing>(mut reader: R) -> IoResult<ConstraintVec<E>> {
-    let n_vec = reader.read_u32::<LittleEndian>()? as usize;
-    let mut vec = Vec::with_capacity(n_vec);
-    for _ in 0..n_vec {
-        vec.push((
-            reader.read_u32::<LittleEndian>()? as usize,
-            E::ScalarField::deserialize_uncompressed(&mut reader)?,
-        ));
+fn _read_constraints<R: Read, E: Pairing>(
+    mut reader: R,
+    header: &Header,
+    size: usize,
+) -> IoResult<Vec<Constraints<E>>> {
+    let mut buffer = vec![0u8; size];
+    reader.read_exact(&mut buffer)?;
+
+    let mut cursor = std::io::Cursor::new(buffer);
+    let mut constraints = Vec::with_capacity(header.n_constraints as usize);
+
+    for _ in 0..header.n_constraints {
+        let a = read_constraint_vec::<_, E>(&mut cursor)?;
+        let b = read_constraint_vec::<_, E>(&mut cursor)?;
+        let c = read_constraint_vec::<_, E>(&mut cursor)?;
+
+        constraints.push((a, b, c));
     }
-    Ok(vec)
+    Ok(constraints)
 }
 
 fn read_constraints<R: Read, E: Pairing>(
     mut reader: R,
     header: &Header,
+    size: usize,
 ) -> IoResult<Vec<Constraints<E>>> {
-    // todo check section size
-    let mut vec = Vec::with_capacity(header.n_constraints as usize);
+    let mut buffer = vec![0u8; size];
+    reader.read_exact(&mut buffer)?;
+
+    let mut cursor = std::io::Cursor::new(buffer);
+    let mut constraints = Vec::with_capacity(header.n_constraints as usize);
+
     for _ in 0..header.n_constraints {
+        constraints.push((
+            read_constraint_vec::<_, E>(&mut cursor)?,
+            read_constraint_vec::<_, E>(&mut cursor)?,
+            read_constraint_vec::<_, E>(&mut cursor)?,
+        ))
+    }
+    Ok(constraints)
+}
+
+fn read_constraint_vec<R: Read, E: Pairing>(mut cursor: R) -> IoResult<ConstraintVec<E>> {
+    let n_vec = cursor.read_u32::<LittleEndian>()? as usize;
+    let mut vec = Vec::with_capacity(n_vec);
+    for _ in 0..n_vec {
         vec.push((
-            read_constraint_vec::<&mut R, E>(&mut reader)?,
-            read_constraint_vec::<&mut R, E>(&mut reader)?,
-            read_constraint_vec::<&mut R, E>(&mut reader)?,
+            cursor.read_u32::<LittleEndian>()? as usize,
+            E::ScalarField::deserialize_uncompressed(&mut cursor)?,
         ));
     }
     Ok(vec)
