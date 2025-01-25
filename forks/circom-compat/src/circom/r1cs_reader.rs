@@ -202,27 +202,6 @@ impl Header {
     }
 }
 
-fn _read_constraints<R: Read, E: Pairing>(
-    mut reader: R,
-    header: &Header,
-    size: usize,
-) -> IoResult<Vec<Constraints<E>>> {
-    let mut buffer = vec![0u8; size];
-    reader.read_exact(&mut buffer)?;
-
-    let mut cursor = std::io::Cursor::new(buffer);
-    let mut constraints = Vec::with_capacity(header.n_constraints as usize);
-
-    for _ in 0..header.n_constraints {
-        let a = read_constraint_vec::<_, E>(&mut cursor)?;
-        let b = read_constraint_vec::<_, E>(&mut cursor)?;
-        let c = read_constraint_vec::<_, E>(&mut cursor)?;
-
-        constraints.push((a, b, c));
-    }
-    Ok(constraints)
-}
-
 fn read_constraints<R: Read, E: Pairing>(
     mut reader: R,
     header: &Header,
