@@ -1,10 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+use crate::daystamp::days_to_be_age;
 use std::{fs, path::PathBuf, error::Error};
-use std::time::{SystemTime, UNIX_EPOCH};
 use ark_bn254::{Bn254 as ECPairing, Fr};
-use ark_circom::{CircomBuilder, CircomConfig};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
@@ -18,20 +17,30 @@ use serde_json::{json,Value};
 use sha2::{Digest, Sha256};
 use utils::{read_from_file, strip_quotes, write_to_file};
 use crate::rangeproof::{RangeProofPK, RangeProofVK};
-use crate::structs::{PublicIOType, IOLocations};
-use crate::{
-    groth16rand::ClientState,
-    structs::{GenericInputsJSON, ProverInput},
-};
-use crate::daystamp::days_to_be_age;
+use crate::structs::{PublicIOType, IOLocations, GenericInputsJSON};
+use crate::groth16rand::ClientState;
+use crate::utils::utc_now_seconds;
 
+#[cfg(not(feature = "wasm"))]
+use {
+    ark_circom::{CircomBuilder, CircomConfig},
+    crate::structs::ProverInput,
+};
+
+#[cfg(feature = "wasm")]
+pub use wasm_lib::create_show_proof_wasm;
+
+#[cfg(feature = "wasm")]
+pub mod wasm_lib;
+
+pub mod daystamp;
 pub mod dlog;
 pub mod groth16rand;
+pub mod prep_inputs;
 pub mod rangeproof;
 pub mod structs;
 pub mod utils;
-pub mod prep_inputs;
-pub mod daystamp;
+
 
 const RANGE_PROOF_INTERVAL_BITS: usize = 32;
 const SHOW_PROOF_VALIDITY_SECONDS: u64 = 300;    // The verifier only accepts proofs fresher than this
@@ -181,6 +190,7 @@ impl CachePaths {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 pub fn run_zksetup(base_path: PathBuf) -> i32 {
 
     let paths = CachePaths::new(base_path);
@@ -223,6 +233,7 @@ pub fn run_zksetup(base_path: PathBuf) -> i32 {
     0
 }
 
+#[cfg(not(feature = "wasm"))]
 pub fn create_client_state(paths : &CachePaths, prover_inputs: &GenericInputsJSON, prover_aux: Option<&String>, credtype : &str) -> Result<ClientState<ECPairing>, SerializationError>
 {
     let circom_timer = start_timer!(|| "Reading R1CS Instance and witness generator WASM");
@@ -329,10 +340,7 @@ pub fn create_show_proof(client_state: &mut ClientState<ECPairing>, range_pk : &
     let show_groth16 = client_state.show_groth16(Some(context_str.as_bytes()), &io_types);
     
     // Create fresh range proof 
-    let time_sec = SystemTime::now()
-    .duration_since(UNIX_EPOCH)
-    .unwrap()
-    .as_secs();
+    let time_sec = utc_now_seconds();
     let cur_time = Fr::from( time_sec );
 
     let mut com_exp_value = client_state.committed_input_openings[0].clone();
@@ -365,11 +373,8 @@ pub fn create_show_proof_mdl(client_state: &mut ClientState<ECPairing>, range_pk
     let show_groth16 = client_state.show_groth16(pm, &io_types);    
     
     // Create fresh range proof for validUntil
-    let time_sec = SystemTime::now()
-    .duration_since(UNIX_EPOCH)
-    .unwrap()
-    .as_secs();
-    let cur_time = Fr::from( time_sec );
+    let time_sec = utc_now_seconds();
+    let cur_time = Fr::from(time_sec);
 
     let mut com_valid_until_value = client_state.committed_input_openings[0].clone();
     com_valid_until_value.m -= cur_time;
@@ -502,7 +507,7 @@ pub fn verify_show(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<ECPai
         return (false, "".to_string());
     }
     let cur_time = Fr::from(show_proof.cur_time);
-    let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let now_seconds = utc_now_seconds();
     let delta = 
         if show_proof.cur_time < now_seconds {
             now_seconds - show_proof.cur_time
@@ -598,7 +603,7 @@ pub fn verify_show_mdl(vp : &VerifierParams<ECPairing>, show_proof: &ShowProof<E
         return (false, "".to_string());
     }
     let cur_time = Fr::from(show_proof.cur_time);
-    let now_seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let now_seconds = utc_now_seconds();
     let delta = 
         if show_proof.cur_time < now_seconds {
             now_seconds - show_proof.cur_time
