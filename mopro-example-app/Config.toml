@@ -1,0 +1,8 @@
+build_mode = ""
+target_adapters = []
+target_platforms = []
+ios = []
+android = []
+auto_update = false
+
+[update]
