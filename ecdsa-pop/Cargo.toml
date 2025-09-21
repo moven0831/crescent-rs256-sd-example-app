@@ -28,9 +28,10 @@ rand = ">=0.8.5"
 flate2 = { version = "1.0.14" }
 num-format = { version = "0.4.3" }
 
-# Enable 'asm' feature when NOT a wasm build
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-halo2curves = { version = "0.8.0", features = ["asm"] }
+# Commented out because it only works on x86_64 but we aim for aarch64 support
+# # Enable 'asm' feature when NOT a wasm build
+# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# halo2curves = { version = "0.8.0", features = ["asm"] }
 
 [features]
 print-trace = ["ark-std/print-trace"]
