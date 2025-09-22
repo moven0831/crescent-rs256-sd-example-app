@@ -494,6 +494,55 @@ class MoproFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 result.error("CRESCENT_CACHE_ERROR", "Failed to cleanup cache", e.message)
             }
 
+        } else if (call.method == "crescentGetTimings") {
+            val cacheId = call.argument<String>("cacheId") ?: return result.error(
+                "ARGUMENT_ERROR",
+                "Missing cacheId",
+                null
+            )
+
+            try {
+                val timings = crescentGetTimings(cacheId)
+                val timingResults = timings.map { timing ->
+                    mapOf(
+                        "operation" to timing.operation,
+                        "durationMs" to timing.durationMs,
+                        "timestamp" to timing.timestamp
+                    )
+                }
+                result.success(timingResults)
+            } catch (e: Exception) {
+                result.error("CRESCENT_TIMING_ERROR", "Failed to get timings", e.message)
+            }
+
+        } else if (call.method == "crescentGetLatestTiming") {
+            val cacheId = call.argument<String>("cacheId") ?: return result.error(
+                "ARGUMENT_ERROR",
+                "Missing cacheId",
+                null
+            )
+            val operation = call.argument<String>("operation") ?: return result.error(
+                "ARGUMENT_ERROR",
+                "Missing operation",
+                null
+            )
+
+            try {
+                val timing = crescentGetLatestTiming(cacheId, operation)
+                if (timing != null) {
+                    val timingResult = mapOf(
+                        "operation" to timing.operation,
+                        "durationMs" to timing.durationMs,
+                        "timestamp" to timing.timestamp
+                    )
+                    result.success(timingResult)
+                } else {
+                    result.success(null)
+                }
+            } catch (e: Exception) {
+                result.error("CRESCENT_TIMING_ERROR", "Failed to get latest timing", e.message)
+            }
+
         } else {
             result.notImplemented()
         }

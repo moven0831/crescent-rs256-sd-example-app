@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:mopro_flutter/mopro_flutter.dart';
+import 'package:mopro_flutter/mopro_types.dart';
 import 'crescent_asset_loader.dart';
+
+extension IterableExtensions<T> on Iterable<T> {
+  T? get lastOrNull => isEmpty ? null : last;
+}
 
 void main() {
   runApp(const MyApp());
@@ -48,6 +53,13 @@ class _CrescentAppState extends State<CrescentApp> {
   String? clientState;
   String? showProof;
   String? verifyResult;
+  String? usedPresentationMessage;
+
+  // Timing State
+  List<TimingResult> timings = [];
+  TimingResult? proveTime;
+  TimingResult? showTime;
+  TimingResult? verifyTime;
 
   // Cached credentials (loaded once)
   CrescentCredentials? _credentials;
@@ -99,13 +111,50 @@ class _CrescentAppState extends State<CrescentApp> {
         clientState = null;
         showProof = null;
         verifyResult = null;
+        usedPresentationMessage = null;
+        proveTime = null;
+        showTime = null;
+        verifyTime = null;
       } else if (step == CrescentStep.show) {
         showProof = null;
         verifyResult = null;
+        usedPresentationMessage = null;
+        showTime = null;
+        verifyTime = null;
       } else if (step == CrescentStep.verify) {
         verifyResult = null;
+        usedPresentationMessage = null;
+        verifyTime = null;
       }
     });
+  }
+
+  Future<void> _updateTimings() async {
+    if (cacheId == null) return;
+
+    try {
+      final latestTimings = await _moproFlutterPlugin.crescentGetTimings(cacheId!);
+      setState(() {
+        timings = latestTimings;
+        proveTime = latestTimings.where((t) => t.operation == 'prove').lastOrNull;
+        showTime = latestTimings.where((t) => t.operation == 'show').lastOrNull;
+        verifyTime = latestTimings.where((t) => t.operation == 'verify').lastOrNull;
+      });
+    } catch (e) {
+      // Ignore timing errors, they're not critical
+    }
+  }
+
+  String? _formatVerificationResult() {
+    if (verifyResult == null) return null;
+
+    String result = "Verification: $verifyResult";
+
+    if (usedPresentationMessage != null) {
+      result += "\n\nPresentation Message:\n\"$usedPresentationMessage\"";
+    }
+
+    return result;
   }
 
   Future<void> _executeProve() async {
@@ -131,6 +180,9 @@ class _CrescentAppState extends State<CrescentApp> {
         clientState = result;
         currentStep = CrescentStep.show;
       });
+
+      // Update timing information
+      await _updateTimings();
     } on Exception catch (e) {
       setState(() {
         _error = e;
@@ -167,6 +219,9 @@ class _CrescentAppState extends State<CrescentApp> {
         showProof = result;
         currentStep = CrescentStep.verify;
       });
+
+      // Update timing information
+      await _updateTimings();
     } on Exception catch (e) {
       setState(() {
         _error = e;
@@ -202,7 +257,13 @@ class _CrescentAppState extends State<CrescentApp> {
 
       setState(() {
         verifyResult = result;
+        usedPresentationMessage = _presentationMessageController.text.isNotEmpty
+            ? _presentationMessageController.text
+            : null;
       });
+
+      // Update timing information
+      await _updateTimings();
     } on Exception catch (e) {
       setState(() {
         _error = e;
@@ -293,6 +354,51 @@ class _CrescentAppState extends State<CrescentApp> {
 
             const SizedBox(height: 16),
 
+            // Timing Information Display
+            if (timings.isNotEmpty)
+              Card(
+                color: Colors.blue.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Operation Timings',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () async {
+                              if (cacheId != null) {
+                                await _moproFlutterPlugin.crescentResetTimings(cacheId!);
+                                await _updateTimings();
+                              }
+                            },
+                            icon: Icon(Icons.refresh, color: Colors.blue.shade600),
+                            tooltip: 'Reset timings',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (proveTime != null)
+                        _buildTimingRow('Prove', proveTime!),
+                      if (showTime != null)
+                        _buildTimingRow('Show', showTime!),
+                      if (verifyTime != null)
+                        _buildTimingRow('Verify', verifyTime!),
+                    ],
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
             // Presentation Message Input
             TextField(
               controller: _presentationMessageController,
@@ -344,13 +450,82 @@ class _CrescentAppState extends State<CrescentApp> {
                     description: 'Verify the presentation proof and extract revealed claims',
                     buttonText: 'Verify Proof',
                     onPressed: showProof != null && cacheId != null ? _executeVerify : null,
-                    result: verifyResult,
+                    result: _formatVerificationResult(),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTimingRow(String operation, TimingResult timing) {
+    MaterialColor getTimingColor(int durationMs) {
+      if (durationMs < 1000) return Colors.green;
+      if (durationMs < 5000) return Colors.orange;
+      return Colors.red;
+    }
+
+    String formatDuration(int durationMs) {
+      if (durationMs < 1000) {
+        return '${durationMs}ms';
+      } else if (durationMs < 60000) {
+        return '${(durationMs / 1000).toStringAsFixed(1)}s';
+      } else {
+        final minutes = durationMs ~/ 60000;
+        final seconds = ((durationMs % 60000) / 1000).toStringAsFixed(1);
+        return '${minutes}m ${seconds}s';
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Container(
+            width: 80,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              operation,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.blue.shade700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: getTimingColor(timing.durationMs).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: getTimingColor(timing.durationMs).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              formatDuration(timing.durationMs),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: getTimingColor(timing.durationMs).shade800,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            DateTime.fromMillisecondsSinceEpoch(timing.timestamp * 1000)
+                .toLocal()
+                .toString()
+                .substring(11, 19), // Show only HH:mm:ss
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }

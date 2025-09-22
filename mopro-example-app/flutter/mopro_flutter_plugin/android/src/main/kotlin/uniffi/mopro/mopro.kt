@@ -766,9 +766,15 @@ internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
     fun uniffi_mopro_example_app_checksum_func_crescent_cleanup_cache(): Short
 
+    fun uniffi_mopro_example_app_checksum_func_crescent_get_latest_timing(): Short
+
+    fun uniffi_mopro_example_app_checksum_func_crescent_get_timings(): Short
+
     fun uniffi_mopro_example_app_checksum_func_crescent_initialize_cache(): Short
 
     fun uniffi_mopro_example_app_checksum_func_crescent_prove(): Short
+
+    fun uniffi_mopro_example_app_checksum_func_crescent_reset_timings(): Short
 
     fun uniffi_mopro_example_app_checksum_func_crescent_show(): Short
 
@@ -835,6 +841,17 @@ internal interface UniffiLib : Library {
         uniffi_out_err: UniffiRustCallStatus,
     ): Unit
 
+    fun uniffi_mopro_example_app_fn_func_crescent_get_latest_timing(
+        `cacheId`: RustBuffer.ByValue,
+        `operation`: RustBuffer.ByValue,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
+    fun uniffi_mopro_example_app_fn_func_crescent_get_timings(
+        `cacheId`: RustBuffer.ByValue,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
     fun uniffi_mopro_example_app_fn_func_crescent_initialize_cache(
         `schemeName`: RustBuffer.ByValue,
         `assetBundle`: RustBuffer.ByValue,
@@ -849,6 +866,11 @@ internal interface UniffiLib : Library {
         `devicePubPem`: RustBuffer.ByValue,
         uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
+
+    fun uniffi_mopro_example_app_fn_func_crescent_reset_timings(
+        `cacheId`: RustBuffer.ByValue,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
 
     fun uniffi_mopro_example_app_fn_func_crescent_show(
         `cacheId`: RustBuffer.ByValue,
@@ -1157,10 +1179,19 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_mopro_example_app_checksum_func_crescent_cleanup_cache() != 60245.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_mopro_example_app_checksum_func_crescent_get_latest_timing() != 39615.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_mopro_example_app_checksum_func_crescent_get_timings() != 63670.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_mopro_example_app_checksum_func_crescent_initialize_cache() != 4578.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_mopro_example_app_checksum_func_crescent_prove() != 42034.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_mopro_example_app_checksum_func_crescent_reset_timings() != 16486.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_mopro_example_app_checksum_func_crescent_show() != 44837.toShort()) {
@@ -1244,6 +1275,26 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
  * @suppress
  * */
 object NoPointer
+
+/**
+ * @suppress
+ */
+public object FfiConverterULong : FfiConverter<ULong, Long> {
+    override fun lift(value: Long): ULong = value.toULong()
+
+    override fun read(buf: ByteBuffer): ULong = lift(buf.getLong())
+
+    override fun lower(value: ULong): Long = value.toLong()
+
+    override fun allocationSize(value: ULong) = 8UL
+
+    override fun write(
+        value: ULong,
+        buf: ByteBuffer,
+    ) {
+        buf.putLong(value.toLong())
+    }
+}
 
 /**
  * @suppress
@@ -1583,6 +1634,74 @@ public object FfiConverterTypeHalo2ProofResult : FfiConverterRustBuffer<Halo2Pro
     }
 }
 
+data class OperationResult(
+    var `result`: kotlin.String,
+    var `timing`: TimingResult,
+) {
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOperationResult : FfiConverterRustBuffer<OperationResult> {
+    override fun read(buf: ByteBuffer): OperationResult =
+        OperationResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeTimingResult.read(buf),
+        )
+
+    override fun allocationSize(value: OperationResult) =
+        (
+            FfiConverterString.allocationSize(value.`result`) +
+                FfiConverterTypeTimingResult.allocationSize(value.`timing`)
+        )
+
+    override fun write(
+        value: OperationResult,
+        buf: ByteBuffer,
+    ) {
+        FfiConverterString.write(value.`result`, buf)
+        FfiConverterTypeTimingResult.write(value.`timing`, buf)
+    }
+}
+
+data class TimingResult(
+    var `operation`: kotlin.String,
+    var `durationMs`: kotlin.ULong,
+    var `timestamp`: kotlin.ULong,
+) {
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTimingResult : FfiConverterRustBuffer<TimingResult> {
+    override fun read(buf: ByteBuffer): TimingResult =
+        TimingResult(
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+        )
+
+    override fun allocationSize(value: TimingResult) =
+        (
+            FfiConverterString.allocationSize(value.`operation`) +
+                FfiConverterULong.allocationSize(value.`durationMs`) +
+                FfiConverterULong.allocationSize(value.`timestamp`)
+        )
+
+    override fun write(
+        value: TimingResult,
+        buf: ByteBuffer,
+    ) {
+        FfiConverterString.write(value.`operation`, buf)
+        FfiConverterULong.write(value.`durationMs`, buf)
+        FfiConverterULong.write(value.`timestamp`, buf)
+    }
+}
+
 sealed class CrescentException(
     message: String,
 ) : kotlin.Exception(message) {
@@ -1811,6 +1930,38 @@ public object FfiConverterOptionalString : FfiConverterRustBuffer<kotlin.String?
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeTimingResult : FfiConverterRustBuffer<TimingResult?> {
+    override fun read(buf: ByteBuffer): TimingResult? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeTimingResult.read(buf)
+    }
+
+    override fun allocationSize(value: TimingResult?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeTimingResult.allocationSize(value)
+        }
+    }
+
+    override fun write(
+        value: TimingResult?,
+        buf: ByteBuffer,
+    ) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeTimingResult.write(value, buf)
+        }
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -1832,6 +1983,34 @@ public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.St
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeTimingResult : FfiConverterRustBuffer<List<TimingResult>> {
+    override fun read(buf: ByteBuffer): List<TimingResult> {
+        val len = buf.getInt()
+        return List<TimingResult>(len) {
+            FfiConverterTypeTimingResult.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<TimingResult>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeTimingResult.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(
+        value: List<TimingResult>,
+        buf: ByteBuffer,
+    ) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeTimingResult.write(it, buf)
         }
     }
 }
@@ -1883,6 +2062,27 @@ fun `crescentCleanupCache`(`cacheId`: kotlin.String) =
         UniffiLib.INSTANCE.uniffi_mopro_example_app_fn_func_crescent_cleanup_cache(FfiConverterString.lower(`cacheId`), _status)
     }
 
+fun `crescentGetLatestTiming`(
+    `cacheId`: kotlin.String,
+    `operation`: kotlin.String,
+): TimingResult? =
+    FfiConverterOptionalTypeTimingResult.lift(
+        uniffiRustCall { _status ->
+            UniffiLib.INSTANCE.uniffi_mopro_example_app_fn_func_crescent_get_latest_timing(
+                FfiConverterString.lower(`cacheId`),
+                FfiConverterString.lower(`operation`),
+                _status,
+            )
+        },
+    )
+
+fun `crescentGetTimings`(`cacheId`: kotlin.String): List<TimingResult> =
+    FfiConverterSequenceTypeTimingResult.lift(
+        uniffiRustCall { _status ->
+            UniffiLib.INSTANCE.uniffi_mopro_example_app_fn_func_crescent_get_timings(FfiConverterString.lower(`cacheId`), _status)
+        },
+    )
+
 @Throws(CrescentException::class)
 fun `crescentInitializeCache`(
     `schemeName`: kotlin.String,
@@ -1918,6 +2118,12 @@ fun `crescentProve`(
             )
         },
     )
+
+@Throws(CrescentException::class)
+fun `crescentResetTimings`(`cacheId`: kotlin.String) =
+    uniffiRustCallWithError(CrescentException) { _status ->
+        UniffiLib.INSTANCE.uniffi_mopro_example_app_fn_func_crescent_reset_timings(FfiConverterString.lower(`cacheId`), _status)
+    }
 
 @Throws(CrescentException::class)
 fun `crescentShow`(

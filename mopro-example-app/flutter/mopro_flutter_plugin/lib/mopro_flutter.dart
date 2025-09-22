@@ -42,4 +42,16 @@ class MoproFlutter {
   Future<void> crescentCleanupCache(String cacheId) async {
     return await MoproFlutterPlatform.instance.crescentCleanupCache(cacheId);
   }
+
+  Future<List<TimingResult>> crescentGetTimings(String cacheId) async {
+    return await MoproFlutterPlatform.instance.crescentGetTimings(cacheId);
+  }
+
+  Future<void> crescentResetTimings(String cacheId) async {
+    return await MoproFlutterPlatform.instance.crescentResetTimings(cacheId);
+  }
+
+  Future<TimingResult?> crescentGetLatestTiming(String cacheId, String operation) async {
+    return await MoproFlutterPlatform.instance.crescentGetLatestTiming(cacheId, operation);
+  }
 }

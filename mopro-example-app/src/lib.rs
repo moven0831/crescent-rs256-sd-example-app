@@ -19,8 +19,13 @@ use serde_json::json;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
 
-use std::{fs, path::{PathBuf, Path}, collections::HashMap, sync::{Arc, Mutex, LazyLock}};
+use std::{fs, path::{PathBuf, Path}, collections::HashMap, sync::{Arc, Mutex, LazyLock}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use sha2::{Sha256, Digest};
+
+// Tracing imports for timing
+use tracing::{instrument, info_span, Instrument};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // Define proper error type for UniFFI compatibility
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -36,6 +41,64 @@ pub enum CrescentError {
     SetupError { msg: String },
     #[error("Cache error: {msg}")]
     CacheError { msg: String },
+}
+
+// Timing measurement structures for UniFFI
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct TimingResult {
+    pub operation: String,
+    pub duration_ms: u64,
+    pub timestamp: u64,
+}
+
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct OperationResult {
+    pub result: String,
+    pub timing: TimingResult,
+}
+
+// Global timing storage
+struct TimingStorage {
+    results: Vec<TimingResult>,
+    enabled: bool,
+}
+
+static TIMING_REGISTRY: LazyLock<Mutex<HashMap<String, TimingStorage>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static TRACING_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+// Initialize tracing subscriber for timing measurements
+fn init_tracing() {
+    if TRACING_INITIALIZED.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+        // Initialize a simple tracing subscriber that doesn't output to console
+        // We'll capture timing data manually
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(|| std::io::sink()) // Use closure to satisfy MakeWriter trait
+            .init();
+    }
+}
+
+// Helper function to record timing
+fn record_timing(cache_id: &str, operation: &str, duration: std::time::Duration) {
+    let timing = TimingResult {
+        operation: operation.to_string(),
+        duration_ms: duration.as_millis() as u64,
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    };
+
+    if let Ok(mut registry) = TIMING_REGISTRY.lock() {
+        registry
+            .entry(cache_id.to_string())
+            .or_insert_with(|| TimingStorage {
+                results: Vec::new(),
+                enabled: true,
+            })
+            .results
+            .push(timing);
+    }
 }
 
 // Asset bundle for efficient mobile loading
@@ -289,8 +352,17 @@ fn crescent_initialize_cache(
     scheme_name: String,
     asset_bundle: AssetBundle
 ) -> Result<String, CrescentError> {
-    create_persistent_cache(&scheme_name, &asset_bundle)
-        .map_err(|e| CrescentError::CacheError { msg: e.to_string() })
+    init_tracing();
+    let start = Instant::now();
+
+    let result = create_persistent_cache(&scheme_name, &asset_bundle)
+        .map_err(|e| CrescentError::CacheError { msg: e.to_string() });
+
+    if let Ok(cache_id) = &result {
+        record_timing(cache_id, "cache_initialize", start.elapsed());
+    }
+
+    result
 }
 
 #[uniffi::export]
@@ -301,6 +373,8 @@ fn crescent_prove(
     config_json: String,
     device_pub_pem: Option<String>
 ) -> Result<String, CrescentError> {
+    let start = Instant::now();
+
     let cache = get_cache_by_id(&cache_id)
         .map_err(|e| CrescentError::CacheError { msg: e.to_string() })?;
 
@@ -321,6 +395,9 @@ fn crescent_prove(
     client_state.serialize_compressed(&mut serialized)
         .map_err(|e| CrescentError::ProveError { msg: format!("Failed to serialize client state: {}", e) })?;
 
+    // Record timing for the prove operation
+    record_timing(&cache_id, "prove", start.elapsed());
+
     Ok(BASE64.encode(&serialized))
 }
 
@@ -332,16 +409,25 @@ fn crescent_show(
     presentation_message: Option<String>,
     device_prv_pem: Option<String>
 ) -> Result<String, CrescentError> {
+    let start = Instant::now();
+
     let cache = get_cache_by_id(&cache_id)
         .map_err(|e| CrescentError::CacheError { msg: e.to_string() })?;
 
-    show_credential_with_paths(
+    let result = show_credential_with_paths(
         &cache.paths,
         &client_state_b64,
         &proof_spec_json,
         presentation_message,
         device_prv_pem.as_deref()
-    ).map_err(|e| CrescentError::ShowError { msg: e.to_string() })
+    ).map_err(|e| CrescentError::ShowError { msg: e.to_string() });
+
+    // Record timing for the show operation
+    if result.is_ok() {
+        record_timing(&cache_id, "show", start.elapsed());
+    }
+
+    result
 }
 
 #[uniffi::export]
@@ -353,23 +439,75 @@ fn crescent_verify(
     issuer_pem: String,
     config_json: String
 ) -> Result<String, CrescentError> {
+    let start = Instant::now();
+
     let cache = get_cache_by_id(&cache_id)
         .map_err(|e| CrescentError::CacheError { msg: e.to_string() })?;
 
-    verify_credential_with_paths(
+    let result = verify_credential_with_paths(
         &cache.paths,
         &show_proof_b64,
         &proof_spec_json,
         presentation_message,
         &issuer_pem,
         &config_json
-    ).map_err(|e| CrescentError::VerifyError { msg: e.to_string() })
+    ).map_err(|e| CrescentError::VerifyError { msg: e.to_string() });
+
+    // Record timing for the verify operation
+    if result.is_ok() {
+        record_timing(&cache_id, "verify", start.elapsed());
+    }
+
+    result
 }
 
 #[uniffi::export]
 fn crescent_cleanup_cache(cache_id: String) -> Result<(), CrescentError> {
+    // Also cleanup timing data for this cache
+    if let Ok(mut registry) = TIMING_REGISTRY.lock() {
+        registry.remove(&cache_id);
+    }
+
     cleanup_cache(&cache_id)
         .map_err(|e| CrescentError::CacheError { msg: e.to_string() })
+}
+
+// Timing retrieval functions
+#[uniffi::export]
+fn crescent_get_timings(cache_id: String) -> Vec<TimingResult> {
+    if let Ok(registry) = TIMING_REGISTRY.lock() {
+        if let Some(storage) = registry.get(&cache_id) {
+            return storage.results.clone();
+        }
+    }
+    Vec::new()
+}
+
+#[uniffi::export]
+fn crescent_reset_timings(cache_id: String) -> Result<(), CrescentError> {
+    if let Ok(mut registry) = TIMING_REGISTRY.lock() {
+        if let Some(storage) = registry.get_mut(&cache_id) {
+            storage.results.clear();
+            return Ok(());
+        }
+    }
+    Err(CrescentError::CacheError {
+        msg: format!("Cache not found: {}", cache_id)
+    })
+}
+
+#[uniffi::export]
+fn crescent_get_latest_timing(cache_id: String, operation: String) -> Option<TimingResult> {
+    if let Ok(registry) = TIMING_REGISTRY.lock() {
+        if let Some(storage) = registry.get(&cache_id) {
+            return storage.results
+                .iter()
+                .rev() // Search from most recent
+                .find(|t| t.operation == operation)
+                .cloned();
+        }
+    }
+    None
 }
 
 

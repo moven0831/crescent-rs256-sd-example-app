@@ -52,3 +52,39 @@ class CrescentException implements Exception {
         : "CrescentException: $message";
   }
 }
+
+/// Timing measurement for operations
+class TimingResult {
+  final String operation;
+  final int durationMs;
+  final int timestamp;
+
+  TimingResult({
+    required this.operation,
+    required this.durationMs,
+    required this.timestamp,
+  });
+
+  DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+
+  @override
+  String toString() {
+    return "TimingResult(operation: $operation, duration: ${durationMs}ms, timestamp: $timestamp)";
+  }
+}
+
+/// Operation result with timing information
+class OperationResult {
+  final String result;
+  final TimingResult timing;
+
+  OperationResult({
+    required this.result,
+    required this.timing,
+  });
+
+  @override
+  String toString() {
+    return "OperationResult(result length: ${result.length}, timing: $timing)";
+  }
+}

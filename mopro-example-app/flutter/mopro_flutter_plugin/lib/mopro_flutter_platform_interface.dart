@@ -69,4 +69,23 @@ abstract class MoproFlutterPlatform extends PlatformInterface {
   ) {
     throw UnimplementedError('crescentCleanupCache() has not been implemented.');
   }
+
+  Future<List<TimingResult>> crescentGetTimings(
+    String cacheId,
+  ) {
+    throw UnimplementedError('crescentGetTimings() has not been implemented.');
+  }
+
+  Future<void> crescentResetTimings(
+    String cacheId,
+  ) {
+    throw UnimplementedError('crescentResetTimings() has not been implemented.');
+  }
+
+  Future<TimingResult?> crescentGetLatestTiming(
+    String cacheId,
+    String operation,
+  ) {
+    throw UnimplementedError('crescentGetLatestTiming() has not been implemented.');
+  }
 }

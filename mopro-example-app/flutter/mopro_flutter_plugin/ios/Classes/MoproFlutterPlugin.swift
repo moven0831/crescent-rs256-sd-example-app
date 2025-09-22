@@ -454,6 +454,59 @@ public class MoproFlutterPlugin: NSObject, FlutterPlugin {
             details: error.localizedDescription))
       }
 
+    case "crescentGetTimings":
+      guard let args = call.arguments as? [String: Any],
+        let cacheId = args["cacheId"] as? String
+      else {
+        result(FlutterError(code: "ARGUMENT_ERROR", message: "Missing required arguments", details: nil))
+        return
+      }
+
+      do {
+        let timings = crescentGetTimings(cacheId: cacheId)
+        let timingResults = timings.map { timing in
+          return [
+            "operation": timing.operation,
+            "durationMs": timing.durationMs,
+            "timestamp": timing.timestamp
+          ] as [String: Any]
+        }
+        result(timingResults)
+      } catch {
+        result(
+          FlutterError(
+            code: "CRESCENT_TIMING_ERROR", message: "Failed to get timings",
+            details: error.localizedDescription))
+      }
+
+    case "crescentGetLatestTiming":
+      guard let args = call.arguments as? [String: Any],
+        let cacheId = args["cacheId"] as? String,
+        let operation = args["operation"] as? String
+      else {
+        result(FlutterError(code: "ARGUMENT_ERROR", message: "Missing required arguments", details: nil))
+        return
+      }
+
+      do {
+        let timing = crescentGetLatestTiming(cacheId: cacheId, operation: operation)
+        if let timing = timing {
+          let timingResult: [String: Any] = [
+            "operation": timing.operation,
+            "durationMs": timing.durationMs,
+            "timestamp": timing.timestamp
+          ]
+          result(timingResult)
+        } else {
+          result(nil)
+        }
+      } catch {
+        result(
+          FlutterError(
+            code: "CRESCENT_TIMING_ERROR", message: "Failed to get latest timing",
+            details: error.localizedDescription))
+      }
+
     default:
       result(FlutterMethodNotImplemented)
     }

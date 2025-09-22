@@ -35,6 +35,11 @@ ark-groth16 = { path = "../forks/groth16", default-features = false, features = 
     "parallel",
 ] }
 
+# Tracing for timing measurements
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
 [build-dependencies]
 rust-witness = "0.1"
 

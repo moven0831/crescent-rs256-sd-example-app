@@ -400,6 +400,22 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
+    typealias FfiType = UInt64
+    typealias SwiftType = UInt64
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterBool : FfiConverter {
     typealias FfiType = Int8
     typealias SwiftType = Bool
@@ -989,6 +1005,154 @@ public func FfiConverterTypeHalo2ProofResult_lower(_ value: Halo2ProofResult) ->
 }
 
 
+public struct OperationResult {
+    public var result: String
+    public var timing: TimingResult
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(result: String, timing: TimingResult) {
+        self.result = result
+        self.timing = timing
+    }
+}
+
+#if compiler(>=6)
+extension OperationResult: Sendable {}
+#endif
+
+
+extension OperationResult: Equatable, Hashable {
+    public static func ==(lhs: OperationResult, rhs: OperationResult) -> Bool {
+        if lhs.result != rhs.result {
+            return false
+        }
+        if lhs.timing != rhs.timing {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(result)
+        hasher.combine(timing)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOperationResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OperationResult {
+        return
+            try OperationResult(
+                result: FfiConverterString.read(from: &buf), 
+                timing: FfiConverterTypeTimingResult.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OperationResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.result, into: &buf)
+        FfiConverterTypeTimingResult.write(value.timing, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOperationResult_lift(_ buf: RustBuffer) throws -> OperationResult {
+    return try FfiConverterTypeOperationResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOperationResult_lower(_ value: OperationResult) -> RustBuffer {
+    return FfiConverterTypeOperationResult.lower(value)
+}
+
+
+public struct TimingResult {
+    public var operation: String
+    public var durationMs: UInt64
+    public var timestamp: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(operation: String, durationMs: UInt64, timestamp: UInt64) {
+        self.operation = operation
+        self.durationMs = durationMs
+        self.timestamp = timestamp
+    }
+}
+
+#if compiler(>=6)
+extension TimingResult: Sendable {}
+#endif
+
+
+extension TimingResult: Equatable, Hashable {
+    public static func ==(lhs: TimingResult, rhs: TimingResult) -> Bool {
+        if lhs.operation != rhs.operation {
+            return false
+        }
+        if lhs.durationMs != rhs.durationMs {
+            return false
+        }
+        if lhs.timestamp != rhs.timestamp {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(operation)
+        hasher.combine(durationMs)
+        hasher.combine(timestamp)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTimingResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimingResult {
+        return
+            try TimingResult(
+                operation: FfiConverterString.read(from: &buf), 
+                durationMs: FfiConverterUInt64.read(from: &buf), 
+                timestamp: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TimingResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.operation, into: &buf)
+        FfiConverterUInt64.write(value.durationMs, into: &buf)
+        FfiConverterUInt64.write(value.timestamp, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimingResult_lift(_ buf: RustBuffer) throws -> TimingResult {
+    return try FfiConverterTypeTimingResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimingResult_lower(_ value: TimingResult) -> RustBuffer {
+    return FfiConverterTypeTimingResult.lower(value)
+}
+
+
 public enum CrescentError {
 
     
@@ -1280,6 +1444,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeTimingResult: FfiConverterRustBuffer {
+    typealias SwiftType = TimingResult?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTimingResult.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTimingResult.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
@@ -1297,6 +1485,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTimingResult: FfiConverterRustBuffer {
+    typealias SwiftType = [TimingResult]
+
+    public static func write(_ value: [TimingResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTimingResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TimingResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TimingResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTimingResult.read(from: &buf))
         }
         return seq
     }
@@ -1333,6 +1546,21 @@ public func crescentCleanupCache(cacheId: String)throws   {try rustCallWithError
     )
 }
 }
+public func crescentGetLatestTiming(cacheId: String, operation: String) -> TimingResult?  {
+    return try!  FfiConverterOptionTypeTimingResult.lift(try! rustCall() {
+    uniffi_mopro_example_app_fn_func_crescent_get_latest_timing(
+        FfiConverterString.lower(cacheId),
+        FfiConverterString.lower(operation),$0
+    )
+})
+}
+public func crescentGetTimings(cacheId: String) -> [TimingResult]  {
+    return try!  FfiConverterSequenceTypeTimingResult.lift(try! rustCall() {
+    uniffi_mopro_example_app_fn_func_crescent_get_timings(
+        FfiConverterString.lower(cacheId),$0
+    )
+})
+}
 public func crescentInitializeCache(schemeName: String, assetBundle: AssetBundle)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCrescentError_lift) {
     uniffi_mopro_example_app_fn_func_crescent_initialize_cache(
@@ -1351,6 +1579,12 @@ public func crescentProve(cacheId: String, jwtToken: String, issuerPem: String, 
         FfiConverterOptionString.lower(devicePubPem),$0
     )
 })
+}
+public func crescentResetTimings(cacheId: String)throws   {try rustCallWithError(FfiConverterTypeCrescentError_lift) {
+    uniffi_mopro_example_app_fn_func_crescent_reset_timings(
+        FfiConverterString.lower(cacheId),$0
+    )
+}
 }
 public func crescentShow(cacheId: String, clientStateB64: String, proofSpecJson: String, presentationMessage: String?, devicePrvPem: String?)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCrescentError_lift) {
@@ -1464,10 +1698,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_mopro_example_app_checksum_func_crescent_cleanup_cache() != 60245) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_mopro_example_app_checksum_func_crescent_get_latest_timing() != 39615) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_mopro_example_app_checksum_func_crescent_get_timings() != 63670) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_mopro_example_app_checksum_func_crescent_initialize_cache() != 4578) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_mopro_example_app_checksum_func_crescent_prove() != 42034) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_mopro_example_app_checksum_func_crescent_reset_timings() != 16486) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_mopro_example_app_checksum_func_crescent_show() != 44837) {

@@ -95,4 +95,53 @@ class MethodChannelMoproFlutter extends MoproFlutterPlatform {
       'cacheId': cacheId,
     });
   }
+
+  @override
+  Future<List<TimingResult>> crescentGetTimings(
+    String cacheId,
+  ) async {
+    final result = await methodChannel.invokeMethod<List<dynamic>>('crescentGetTimings', {
+      'cacheId': cacheId,
+    });
+
+    if (result == null) return [];
+
+    return result.map((item) {
+      final map = Map<String, dynamic>.from(item);
+      return TimingResult(
+        operation: map['operation'] as String,
+        durationMs: map['durationMs'] as int,
+        timestamp: map['timestamp'] as int,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<void> crescentResetTimings(
+    String cacheId,
+  ) async {
+    await methodChannel.invokeMethod<void>('crescentResetTimings', {
+      'cacheId': cacheId,
+    });
+  }
+
+  @override
+  Future<TimingResult?> crescentGetLatestTiming(
+    String cacheId,
+    String operation,
+  ) async {
+    final result = await methodChannel.invokeMethod<Map<dynamic, dynamic>>('crescentGetLatestTiming', {
+      'cacheId': cacheId,
+      'operation': operation,
+    });
+
+    if (result == null) return null;
+
+    final map = Map<String, dynamic>.from(result);
+    return TimingResult(
+      operation: map['operation'] as String,
+      durationMs: map['durationMs'] as int,
+      timestamp: map['timestamp'] as int,
+    );
+  }
 }
