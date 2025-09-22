@@ -17,9 +17,23 @@ mopro-ffi = { git = "https://github.com/zkmopro/mopro.git", features = ["uniffi"
 rust-witness = "0.1"
 num-bigint = "0.4.0"
 thiserror = "2.0.12"
-# HALO2_DEPENDENCIES
 
-# NOIR_DEPENDENCIES
+# Crescent integration
+crescent = { path = "../creds" }
+sha2 = "0.10.8"
+ark-serialize = { version = "0.4.1", default-features = false }
+
+# json parsing
+serde_json = {version = "1.0", features = ["preserve_order"]}
+serde = { version = "1.0", features = ["derive"] }
+
+# base64 encoding for UniFFI
+base64 = "0.22"
+
+# Key Traits
+ark-groth16 = { path = "../forks/groth16", default-features = false, features = [
+    "parallel",
+] }
 
 [build-dependencies]
 rust-witness = "0.1"
